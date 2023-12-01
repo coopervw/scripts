@@ -1,10 +1,11 @@
 import sys
 import os
 import fitz
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QLabel, QPushButton, QFileDialog, QSplitter, QSizePolicy, QScrollArea, QMenu, QAction, QInputDialog, QLineEdit
-from PyQt5.QtGui import QPixmap, QImage, QPainter
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QLabel, QPushButton, QFileDialog, QSplitter, QSizePolicy, QScrollArea, QMenu, QAction, QInputDialog, QLineEdit, QTextEdit
+from PyQt5.QtGui import QPixmap, QImage, QPainter, QFont
 from PyQt5.QtCore import Qt
 import PyPDF2
+from PyPDF2 import PdfReader
 
 class PDFViewer(QWidget):
     def __init__(self):
@@ -62,6 +63,11 @@ class PDFViewer(QWidget):
         self.rename_action = QAction("Rename", self)
         self.rename_action.triggered.connect(self.rename_selected)
         self.context_menu.addAction(self.rename_action)
+        
+        # Add a new action for opening the file to the context menu
+        self.open_action = QAction("Open", self)
+        self.open_action.triggered.connect(self.open_pdf)
+        self.context_menu.addAction(self.open_action)
 
         # Create a horizontal layout for buttons
         button_layout = QHBoxLayout()
@@ -72,6 +78,16 @@ class PDFViewer(QWidget):
         self.combine_button = QPushButton("Combine PDFs")
         self.combine_button.clicked.connect(self.combine_pdfs)
         button_layout.addWidget(self.combine_button)
+        
+        # Create a button to generate_page_numbers
+        self.generate_page_numbers_button = QPushButton("Generate Page Numbers")
+        self.generate_page_numbers_button.clicked.connect(self.generate_page_numbers)
+
+        # Add the button to the button_layout
+        button_layout.addWidget(self.generate_page_numbers_button)
+
+        # Connect the itemDoubleClicked signal to open_pdf method
+        self.list_widget.itemDoubleClicked.connect(self.open_pdf)
 
         main_layout.addLayout(button_layout)
         main_layout.addWidget(splitter)
@@ -79,6 +95,48 @@ class PDFViewer(QWidget):
         self.setLayout(main_layout)
 
         self.selected_pdf = None  # Store the currently selected PDF path
+
+    def generate_page_numbers(self):
+        if hasattr(self, 'selected_pdf'):
+            current_directory = os.path.dirname(self.selected_pdf)
+            page_numbers = self.list_pagination(current_directory)
+
+            # Display the page numbers in a new window
+            self.show_page_numbers(page_numbers)
+
+    def show_page_numbers(self, page_numbers):
+        # Make page_numbers_window an instance variable by adding self.
+        self.page_numbers_window = QWidget()
+        self.page_numbers_window.setWindowTitle("Page Numbers")
+        self.page_numbers_window.setGeometry(200, 200, 400, 300)
+
+        # Create a layout for the page numbers window
+        page_numbers_layout = QVBoxLayout(self.page_numbers_window)
+
+        # Create a label to display the page numbers
+        page_numbers_label = QLabel("Page Numbers:")
+        page_numbers_layout.addWidget(page_numbers_label)
+
+        # Create a QTextEdit widget to display the page numbers
+        page_numbers_textedit = QTextEdit()
+        page_numbers_textedit.setReadOnly(True)
+        page_numbers_textedit.setPlainText(self.format_page_numbers(page_numbers))
+
+        # Set a monospaced font
+        font = QFont("Courier")
+        page_numbers_textedit.setFont(font)
+
+        page_numbers_layout.addWidget(page_numbers_textedit)
+
+        self.page_numbers_window.setLayout(page_numbers_layout)
+        self.page_numbers_window.show()
+
+    def format_page_numbers(self, page_numbers):
+        # Format the page numbers with specified padding
+        formatted_page_numbers = ""
+        for page_data in page_numbers:
+            formatted_page_numbers += f"{page_data['filename'].ljust(6)}: {str(page_data['start']).rjust(3)} - {str(page_data['end']).ljust(3)}\n"
+        return formatted_page_numbers
 
     def choose_directory(self):
         directory = QFileDialog.getExistingDirectory(self, "Choose Directory")
@@ -163,6 +221,33 @@ class PDFViewer(QWidget):
         # Resize the scaled PDF preview label when the splitter or main window is resized
         if self.selected_pdf:
             self.display_pdf(self.selected_pdf)
+            
+    def list_pagination(self, folder_path):
+        files = [f for f in os.listdir(folder_path) if f.endswith('.pdf')]
+        files.sort()
+        page_ranges = []
+        start_page = 1
+        for file in files:
+            with open(os.path.join(folder_path, file), 'rb') as f:
+                pdf = PdfReader(f)
+                end_page = start_page + len(pdf.pages) - 1
+                filename, extension = os.path.splitext(file)
+                page_data = {
+                    'filename': filename,
+                    'start': start_page,
+                    'end': end_page
+                }
+                page_ranges.append(page_data)
+                start_page = end_page + 1
+        
+        return page_ranges
+        
+    def open_pdf(self):
+        selected_item = self.list_widget.currentItem()
+        if selected_item is not None:
+            selected_pdf = self.pdf_files[self.list_widget.row(selected_item)]
+            os.startfile(selected_pdf)  # Adjust for different platforms if necessary
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
