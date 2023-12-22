@@ -13,6 +13,5 @@ def convert_folder_images(folder_path):
             convert_heic_to_png(heic_file, png_file)
             print(f"Converted: {file_name}")
 
-# Usage example
-folder_path = "\\THW-FILE\redirected-folders$\cooper\Desktop\Images\"
+folder_path = ""
 convert_folder_images(folder_path)
