@@ -1,7 +1,7 @@
 import sys
 import os
 import fitz
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QLabel, QPushButton, QFileDialog, QSplitter, QSizePolicy, QScrollArea, QMenu, QAction, QInputDialog, QLineEdit, QTextEdit
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QLabel, QPushButton, QFileDialog, QSplitter, QSizePolicy, QScrollArea, QMenu, QAction, QInputDialog, QLineEdit, QTextEdit, QMessageBox
 from PyQt5.QtGui import QPixmap, QImage, QPainter, QFont
 from PyQt5.QtCore import Qt
 import PyPDF2
@@ -186,20 +186,28 @@ class PDFViewer(QWidget):
         self.context_menu.exec_(self.mapToGlobal(event.pos()))
 
     def rename_selected(self):
-        selected_index = self.list_widget.currentRow()
-        if selected_index != -1:
-            selected_pdf = self.pdf_files[selected_index]
+        try:
+            selected_index = self.list_widget.currentRow()
+            if selected_index != -1:
+                selected_pdf = self.pdf_files[selected_index]
 
-            current_name = os.path.basename(selected_pdf)
-            new_name, ok = QInputDialog.getText(self, "Rename File", "Enter new file name:", QLineEdit.Normal, current_name)
+                current_name = os.path.basename(selected_pdf)
+                new_name, ok = QInputDialog.getText(self, "Rename File", "Enter new file name:", QLineEdit.Normal, current_name)
 
-            if ok and new_name.strip() != "":
-                # Ensure the new name doesn't already have a .pdf extension
-                if not new_name.endswith(".pdf"):
-                    new_name += ".pdf"
-                new_pdf_path = os.path.join(os.path.dirname(selected_pdf), new_name)
-                os.rename(selected_pdf, new_pdf_path)
-                self.load_pdf_files(os.path.dirname(selected_pdf))
+                if ok and new_name.strip() != "":
+                    # Ensure the new name doesn't already have a .pdf extension
+                    if not new_name.endswith(".pdf"):
+                        new_name += ".pdf"
+                    new_pdf_path = os.path.join(os.path.dirname(selected_pdf), new_name)
+                    os.rename(selected_pdf, new_pdf_path)
+                    self.load_pdf_files(os.path.dirname(selected_pdf))
+        except FileExistsError as e:
+            error_dialog = QMessageBox()
+            error_dialog.setIcon(QMessageBox.Critical)
+            error_dialog.setText("Error")
+            error_dialog.setInformativeText(str(e))
+            error_dialog.setWindowTitle("Error")
+            error_dialog.exec_()
 
     def combine_pdfs(self):
         if self.pdf_files:
@@ -214,8 +222,9 @@ class PDFViewer(QWidget):
     def refresh_list(self):
         # Refresh the list of PDF files in the current directory
         if hasattr(self, 'selected_pdf'):
-            current_directory = os.path.dirname(self.selected_pdf)
-            self.load_pdf_files(current_directory)
+            if self.selected_pdf != None:
+                current_directory = os.path.dirname(self.selected_pdf)
+                self.load_pdf_files(current_directory)
 
     def resizeEvent(self, event):
         # Resize the scaled PDF preview label when the splitter or main window is resized
